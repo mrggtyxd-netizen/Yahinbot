@@ -12,6 +12,7 @@ TOKEN = os.getenv("TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.presences = True
 
 bot = commands.Bot(command_prefix="Yahin ", intents=intents)
 
@@ -28,7 +29,7 @@ def keep_alive():
     Thread(target=run_flask, daemon=True).start()
 
 warnings_db = {}
-pregunta_activa = {}  # guild_id -> data
+pregunta_activa = {}
 
 preguntas = [
     ("¿Cuál es el planeta más grande?", "Júpiter"),
@@ -155,9 +156,10 @@ async def ping(ctx):
 
 @bot.command()
 @commands.has_permissions(moderate_members=True)
-async def warn(ctx, member: discord.Member, *, reason="Sin razón"):
+async def warn(ctx, member: discord.Member, *, reason):
     warnings_db.setdefault(str(member.id), []).append(reason)
-    await ctx.send(f"Warn dado a {member.mention}. Razón: {reason}")
+    total = len(warnings_db[str(member.id)])
+    await ctx.send(f"{member.mention} has sido advertido y ahora tienes {total} advertencias.\nRazón: {reason}")
 
 @bot.command()
 @commands.has_permissions(ban_members=True)
@@ -200,7 +202,6 @@ async def pregunta(ctx):
         return await ctx.send("No hay preguntas cargadas.")
 
     key = ctx.guild.id if ctx.guild else ctx.author.id
-
     if key in pregunta_activa:
         return await ctx.send("Ya hay una pregunta activa.")
 
@@ -231,9 +232,8 @@ async def pregunta(ctx):
         pregunta_activa.pop(key, None)
         await ctx.send(f"✅ {ctx.author.mention} ¡La adivinaste!")
     except discord.TimeoutError:
-        respuesta_real = pregunta_activa.get(key, {}).get("answer", "No disponible")
         pregunta_activa.pop(key, None)
-        await ctx.send(f"⏰ Tiempo agotado. La respuesta era: **{respuesta}**")
+        await ctx.send(f"⏰ {ctx.author.mention}, se acabó el tiempo. La respuesta era: **{respuesta}**")
 
 @bot.command(name="addrol")
 @commands.has_permissions(manage_roles=True)
@@ -243,15 +243,29 @@ async def addrol(ctx, rol: discord.Role, member: discord.Member):
 
 @bot.command()
 async def staff(ctx):
-    staff_roles = ["staff", "mod", "moderador"]
-    staff_members = [
-        m.mention for m in ctx.guild.members
-        if not m.bot and any(r.name.lower() in staff_roles for r in m.roles)
+    role_id = 1521606098791043092
+    role = ctx.guild.get_role(role_id)
+
+    if role is None:
+        return await ctx.send("No encontré ese rol.")
+
+    conectados = [
+        m for m in role.members
+        if m.status != discord.Status.offline and not m.bot
     ]
 
-    if not staff_members:
-        return await ctx.send("No encontré staff conectado.")
-    await ctx.send("Staff conectado:\n" + "\n".join(staff_members))
+    if not conectados:
+        return await ctx.send("No hay miembros del staff conectados.")
+
+    mentions = " ".join(m.mention for m in conectados)
+
+    embed = discord.Embed(
+        title="Staff conectado",
+        description=f"Hay **{len(conectados)}** miembros conectados:\n\n{mentions}",
+        color=discord.Color.green()
+    )
+    await ctx.send(embed=embed)
+
 
 keep_alive()
 bot.run(TOKEN)
