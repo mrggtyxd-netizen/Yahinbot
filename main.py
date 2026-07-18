@@ -253,12 +253,5 @@ async def staff(ctx):
         return await ctx.send("No encontré staff conectado.")
     await ctx.send("Staff conectado:\n" + "\n".join(staff_members))
 
-@bot.command()
-async def help(ctx):
-    await ctx.send(
-        "Comandos: Yahin warn, Yahin ban, Yahin mute, Yahin avatar, "
-        "Yahin warnings, Yahin pregunta, Yahin addrol, Yahin staff"
-    )
-
 keep_alive()
 bot.run(TOKEN)
