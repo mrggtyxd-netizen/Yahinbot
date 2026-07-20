@@ -1,21 +1,13 @@
 import os
+import json
 import random
-import unicodedata
 import asyncio
+from datetime import timedelta
+from threading import Thread
+
 import discord
 from discord.ext import commands
 from flask import Flask
-from threading import Thread
-from datetime import timedelta
-
-TOKEN = os.getenv("TOKEN")
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.presences = True
-
-bot = commands.Bot(command_prefix="Yahin ", intents=intents)
 
 app = Flask(__name__)
 
@@ -24,249 +16,251 @@ def home():
     return "Bot online"
 
 def run_flask():
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=8080)
 
-def keep_alive():
-    Thread(target=run_flask, daemon=True).start()
+Thread(target=run_flask, daemon=True).start()
 
-warnings_db = {}
-pregunta_activa = {}
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+intents.presences = True
+
+bot = commands.Bot(command_prefix="Yahin ", intents=intents, help_command=None)
+
+ROLE_ID_STAFF = 1521606098791043092
+WARNS_FILE = "warns.json"
 
 preguntas = [
-    ("¿Cuál es el planeta más grande?", "Júpiter"),
-    ("¿Cuántos huesos tiene un adulto?", "206"),
-    ("¿Quién pintó la Mona Lisa?", "Leonardo da Vinci"),
-    ("¿Cuál es la capital de Canadá?", "Ottawa"),
-    ("¿Qué gas necesitan las plantas para hacer la fotosíntesis?", "Dióxido de carbono"),
-    ("¿Cuánto es 12×12?", "144"),
-    ("¿Cuál es el río más largo del mundo?", "Nilo"),
-    ("¿En qué continente está Egipto?", "África"),
-    ("¿Quién escribió Don Quijote?", "Miguel de Cervantes"),
-    ("¿Cuál es el océano más pequeño?", "Ártico"),
-    ("¿Qué planeta tiene anillos?", "Saturno"),
-    ("¿Cuánto es 15²?", "225"),
-    ("¿Cuál es el metal más ligero?", "Litio"),
-    ("¿Qué país tiene más habitantes?", "India"),
-    ("¿Qué instrumento mide los terremotos?", "Sismógrafo"),
-    ("¿Cuál es el animal terrestre más rápido?", "Guepardo"),
-    ("¿Cuántos lados tiene un octágono?", "8"),
-    ("¿Quién descubrió América en 1492?", "Cristóbal Colón"),
-    ("¿Cuál es el idioma más hablado del mundo?", "Mandarín"),
-    ("¿Qué país inventó el sushi?", "Japón"),
-    ("¿Qué órgano bombea la sangre?", "Corazón"),
-    ("¿Qué número romano representa el 50?", "L"),
-    ("¿Qué montaña es la más alta del mundo?", "Everest"),
-    ("¿Qué planeta es conocido como el gigante gaseoso?", "Júpiter"),
-    ("¿Cuánto es 18×7?", "126"),
-    ("¿Cuál es la capital de Australia?", "Canberra"),
-    ("¿Qué elemento tiene el símbolo Fe?", "Hierro"),
-    ("¿Qué país tiene forma de bota?", "Italia"),
-    ("¿Cuál es el animal más grande del mundo?", "Ballena azul"),
-    ("¿Qué océano baña la costa este de América?", "Atlántico"),
-    ("¿Qué inventor creó la bombilla?", "Thomas Edison"),
-    ("¿Cuántos continentes hay?", "7"),
-    ("¿Cuál es el desierto más grande del mundo?", "Sahara"),
-    ("¿Qué país tiene la Torre de Pisa?", "Italia"),
-    ("¿Qué vitamina produce el Sol en nuestro cuerpo?", "Vitamina D"),
-    ("¿Cuánto es 144÷12?", "12"),
-    ("¿Qué planeta tarda más en dar la vuelta al Sol?", "Neptuno"),
-    ("¿Cuál es la moneda de Japón?", "Yen"),
-    ("¿Qué país tiene la Gran Muralla?", "China"),
-    ("¿Quién pintó La última cena?", "Leonardo da Vinci"),
-    ("¿Cuál es el satélite natural de la Tierra?", "La Luna"),
-    ("¿Qué animal puede cambiar de color?", "Camaleón"),
-    ("¿Cuál es la capital de Brasil?", "Brasilia"),
-    ("¿Qué país tiene más islas?", "Suecia"),
-    ("¿Qué instrumento sirve para ver estrellas?", "Telescopio"),
-    ("¿Cuál es el hueso más largo del cuerpo?", "Fémur"),
-    ("¿Qué país ganó el Mundial 2010?", "España"),
-    ("¿Qué océano está entre América y Europa?", "Atlántico"),
-    ("¿Qué animal pone el huevo más grande?", "Avestruz"),
-    ("¿Cuánto es 25×8?", "200"),
-    ("¿Qué país tiene forma de hexágono?", "Francia"),
-    ("¿Cuál es el idioma oficial de Brasil?", "Portugués"),
-    ("¿Qué gas respiramos principalmente?", "Oxígeno"),
-    ("¿Qué rey construyó Versalles?", "Luis XIV"),
-    ("¿Cuál es el volcán más alto del mundo?", "Ojos del Salado"),
-    ("¿Qué país tiene más volcanes activos?", "Indonesia"),
-    ("¿Cuál es la capital de Argentina?", "Buenos Aires"),
-    ("¿Quién formuló la ley de la gravedad?", "Isaac Newton"),
-    ("¿Qué país inventó la pizza?", "Italia"),
-    ("¿Qué planeta tiene el día más largo?", "Venus"),
-    ("¿Cuál es la capital de Noruega?", "Oslo"),
-    ("¿Qué mamífero vuela?", "Murciélago"),
-    ("¿Qué país tiene la Estatua de la Libertad?", "Estados Unidos"),
-    ("¿Qué instrumento mide la temperatura?", "Termómetro"),
-    ("¿Cuál es el país más grande del mundo?", "Rusia"),
-    ("¿Qué animal tiene tres corazones?", "Pulpo"),
-    ("¿Cuál es la capital de Turquía?", "Ankara"),
-    ("¿Quién escribió Harry Potter?", "J. K. Rowling"),
-    ("¿Qué océano rodea la Antártida?", "Océano Antártico"),
-    ("¿Cuál es el ave más grande?", "Avestruz"),
-    ("¿Qué país tiene las pirámides de Giza?", "Egipto"),
-    ("¿Qué inventó Alexander Graham Bell?", "Teléfono"),
-    ("¿Cuál es la capital de Marruecos?", "Rabat"),
-    ("¿Qué planeta tiene más lunas?", "Saturno"),
-    ("¿Qué país tiene el Coliseo?", "Italia"),
-    ("¿Cuál es el animal nacional de Australia?", "Canguro"),
-    ("¿Qué órgano produce la insulina?", "Páncreas"),
-    ("¿Cuál es el número primo más pequeño?", "2"),
-    ("¿Qué científico desarrolló la teoría de la relatividad?", "Albert Einstein"),
-    ("¿Cuál es el país más pequeño del mundo?", "Vaticano"),
-    ("¿Qué elemento tiene el símbolo Au?", "Oro"),
-    ("¿Cuál es la capital de Suiza?", "Berna"),
-    ("¿Qué continente tiene más países?", "África"),
-    ("¿Qué país tiene el Cristo Redentor?", "Brasil"),
-    ("¿Cuál es el mamífero más grande?", "Ballena azul"),
-    ("¿Qué planeta está más lejos del Sol?", "Neptuno"),
-    ("¿Quién escribió Romeo y Julieta?", "William Shakespeare"),
-    ("¿Qué país tiene la Sagrada Familia?", "España"),
-    ("¿Qué animal duerme de pie?", "Caballo"),
-    ("¿Qué país inventó el papel?", "China"),
-    ("¿Cuál es el mar más grande?", "Mar Caribe"),
-    ("¿Qué instrumento mide la presión atmosférica?", "Barómetro"),
-    ("¿Cuál es la capital de Corea del Sur?", "Seúl"),
-    ("¿Qué país tiene el Big Ben?", "Reino Unido"),
-    ("¿Qué animal es conocido como el rey de la selva?", "León"),
-    ("¿Qué país tiene el Machu Picchu?", "Perú"),
-    ("¿Qué órgano filtra la sangre?", "Riñón"),
-    ("¿Cuál es el planeta más caliente?", "Venus"),
-    ("¿Qué país tiene el Taj Mahal?", "India"),
-    ("¿Cuál es el elemento químico más abundante del universo?", "Hidrógeno"),
+    {"pregunta": "¿Cuál es el planeta más grande?", "respuesta": "jupiter"},
+    {"pregunta": "¿Cuántos huesos tiene un adulto?", "respuesta": "206"},
+    {"pregunta": "¿Quién pintó la Mona Lisa?", "respuesta": "leonardo da vinci"},
+    {"pregunta": "¿Cuál es la capital de Canadá?", "respuesta": "ottawa"},
+    {"pregunta": "¿Qué gas necesitan las plantas para hacer la fotosíntesis?", "respuesta": "dioxido de carbono"},
+    {"pregunta": "¿Cuánto es 12×12?", "respuesta": "144"},
+    {"pregunta": "¿Cuál es el río más largo del mundo?", "respuesta": "nilo"},
+    {"pregunta": "¿En qué continente está Egipto?", "respuesta": "africa"},
+    {"pregunta": "¿Quién escribió Don Quijote?", "respuesta": "miguel de cervantes"},
+    {"pregunta": "¿Cuál es el océano más pequeño?", "respuesta": "artico"},
+    {"pregunta": "¿Qué planeta tiene anillos?", "respuesta": "saturno"},
+    {"pregunta": "¿Cuánto es 15²?", "respuesta": "225"},
+    {"pregunta": "¿Cuál es el metal más ligero?", "respuesta": "litio"},
+    {"pregunta": "¿Qué país tiene más habitantes?", "respuesta": "india"},
+    {"pregunta": "¿Qué instrumento mide los terremotos?", "respuesta": "sismografo"},
+    {"pregunta": "¿Cuál es el animal terrestre más rápido?", "respuesta": "guepardo"},
+    {"pregunta": "¿Cuántos lados tiene un octágono?", "respuesta": "8"},
+    {"pregunta": "¿Quién descubrió América en 1492?", "respuesta": "cristobal colon"},
+    {"pregunta": "¿Cuál es el idioma más hablado del mundo?", "respuesta": "mandarin"},
+    {"pregunta": "¿Qué país inventó el sushi?", "respuesta": "japon"},
+    {"pregunta": "¿Qué órgano bombea la sangre?", "respuesta": "corazon"},
+    {"pregunta": "¿Qué número romano representa el 50?", "respuesta": "l"},
+    {"pregunta": "¿Qué montaña es la más alta del mundo?", "respuesta": "everest"},
+    {"pregunta": "¿Qué planeta es conocido como el gigante gaseoso?", "respuesta": "jupiter"},
+    {"pregunta": "¿Cuánto es 18×7?", "respuesta": "126"},
+    {"pregunta": "¿Cuál es la capital de Australia?", "respuesta": "canberra"},
+    {"pregunta": "¿Qué elemento tiene el símbolo Fe?", "respuesta": "hierro"},
+    {"pregunta": "¿Qué país tiene forma de bota?", "respuesta": "italia"},
+    {"pregunta": "¿Cuál es el animal más grande del mundo?", "respuesta": "ballena azul"},
+    {"pregunta": "¿Qué océano baña la costa este de América?", "respuesta": "atlantico"},
+    {"pregunta": "¿Qué inventor creó la bombilla?", "respuesta": "thomas edison"},
+    {"pregunta": "¿Cuántos continentes hay?", "respuesta": "7"},
+    {"pregunta": "¿Cuál es el desierto más grande del mundo?", "respuesta": "antartida"},
+    {"pregunta": "¿Qué país tiene la Torre de Pisa?", "respuesta": "italia"},
+    {"pregunta": "¿Qué vitamina produce el Sol en nuestro cuerpo?", "respuesta": "vitamina d"},
+    {"pregunta": "¿Cuánto es 144÷12?", "respuesta": "12"},
+    {"pregunta": "¿Qué planeta tarda más en dar la vuelta al Sol?", "respuesta": "neptuno"},
+    {"pregunta": "¿Cuál es la moneda de Japón?", "respuesta": "yen"},
+    {"pregunta": "¿Qué país tiene la Gran Muralla?", "respuesta": "china"},
+    {"pregunta": "¿Quién pintó La última cena?", "respuesta": "leonardo da vinci"},
+    {"pregunta": "¿Cuál es el satélite natural de la Tierra?", "respuesta": "luna"},
+    {"pregunta": "¿Qué animal puede cambiar de color?", "respuesta": "camaleon"},
+    {"pregunta": "¿Cuál es la capital de Brasil?", "respuesta": "brasilia"},
+    {"pregunta": "¿Qué país tiene más islas?", "respuesta": "suecia"},
+    {"pregunta": "¿Qué instrumento sirve para ver estrellas?", "respuesta": "telescopio"},
+    {"pregunta": "¿Cuál es el hueso más largo del cuerpo?", "respuesta": "femur"},
+    {"pregunta": "¿Qué país ganó el Mundial 2010?", "respuesta": "españa"},
+    {"pregunta": "¿Qué océano está entre América y Europa?", "respuesta": "atlantico"},
+    {"pregunta": "¿Qué animal pone el huevo más grande?", "respuesta": "avestruz"},
+    {"pregunta": "¿Cuánto es 25×8?", "respuesta": "200"},
+    {"pregunta": "¿Qué país tiene forma de hexágono?", "respuesta": "francia"},
+    {"pregunta": "¿Cuál es el idioma oficial de Brasil?", "respuesta": "portugues"},
+    {"pregunta": "¿Qué gas respiramos principalmente?", "respuesta": "oxigeno"},
+    {"pregunta": "¿Qué rey construyó Versalles?", "respuesta": "luis xiv"},
+    {"pregunta": "¿Cuál es el volcán más alto del mundo?", "respuesta": "ojos del salado"},
+    {"pregunta": "¿Qué país tiene más volcanes activos?", "respuesta": "indonesia"},
+    {"pregunta": "¿Cuál es la capital de Argentina?", "respuesta": "buenos aires"},
+    {"pregunta": "¿Quién formuló la ley de la gravedad?", "respuesta": "isaac newton"},
+    {"pregunta": "¿Qué país inventó la pizza?", "respuesta": "italia"},
+    {"pregunta": "¿Qué planeta tiene el día más largo?", "respuesta": "venus"},
+    {"pregunta": "¿Cuál es la capital de Noruega?", "respuesta": "oslo"},
+    {"pregunta": "¿Qué mamífero vuela?", "respuesta": "murcielago"},
+    {"pregunta": "¿Qué país tiene la Estatua de la Libertad?", "respuesta": "estados unidos"},
+    {"pregunta": "¿Qué instrumento mide la temperatura?", "respuesta": "termometro"},
+    {"pregunta": "¿Cuál es el país más grande del mundo?", "respuesta": "rusia"},
+    {"pregunta": "¿Qué animal tiene tres corazones?", "respuesta": "pulpo"},
+    {"pregunta": "¿Cuál es la capital de Turquía?", "respuesta": "ankara"},
+    {"pregunta": "¿Quién escribió Harry Potter?", "respuesta": "j k rowling"},
+    {"pregunta": "¿Qué océano rodea la Antártida?", "respuesta": "antartico"},
+    {"pregunta": "¿Cuál es el ave más grande?", "respuesta": "avestruz"},
+    {"pregunta": "¿Qué país tiene las pirámides de Giza?", "respuesta": "egipto"},
+    {"pregunta": "¿Qué inventó Alexander Graham Bell?", "respuesta": "telefono"},
+    {"pregunta": "¿Cuál es la capital de Marruecos?", "respuesta": "rabat"},
+    {"pregunta": "¿Qué planeta tiene más lunas?", "respuesta": "saturno"},
+    {"pregunta": "¿Qué país tiene el Coliseo?", "respuesta": "italia"},
+    {"pregunta": "¿Cuál es el animal nacional de Australia?", "respuesta": "canguro"},
+    {"pregunta": "¿Qué órgano produce la insulina?", "respuesta": "pancreas"},
+    {"pregunta": "¿Cuál es el número primo más pequeño?", "respuesta": "2"},
+    {"pregunta": "¿Qué científico desarrolló la teoría de la relatividad?", "respuesta": "albert einstein"},
+    {"pregunta": "¿Cuál es el país más pequeño del mundo?", "respuesta": "vaticano"},
+    {"pregunta": "¿Qué elemento tiene el símbolo Au?", "respuesta": "oro"},
+    {"pregunta": "¿Cuál es la capital de Suiza?", "respuesta": "berna"},
+    {"pregunta": "¿Qué continente tiene más países?", "respuesta": "africa"},
+    {"pregunta": "¿Qué país tiene el Cristo Redentor?", "respuesta": "brasil"},
+    {"pregunta": "¿Cuál es el mamífero más grande?", "respuesta": "ballena azul"},
+    {"pregunta": "¿Qué planeta está más lejos del Sol?", "respuesta": "neptuno"},
+    {"pregunta": "¿Quién escribió Romeo y Julieta?", "respuesta": "shakespeare"},
+    {"pregunta": "¿Qué país tiene la Sagrada Familia?", "respuesta": "españa"},
+    {"pregunta": "¿Qué animal duerme de pie?", "respuesta": "caballo"},
+    {"pregunta": "¿Qué país inventó el papel?", "respuesta": "china"},
+    {"pregunta": "¿Cuál es el mar más grande?", "respuesta": "mar de filipinas"},
+    {"pregunta": "¿Qué instrumento mide la presión atmosférica?", "respuesta": "barometro"},
+    {"pregunta": "¿Cuál es la capital de Corea del Sur?", "respuesta": "seul"},
+    {"pregunta": "¿Qué país tiene el Big Ben?", "respuesta": "reino unido"},
+    {"pregunta": "¿Qué animal es conocido como el rey de la selva?", "respuesta": "leon"},
+    {"pregunta": "¿Qué país tiene el Machu Picchu?", "respuesta": "peru"},
+    {"pregunta": "¿Qué órgano filtra la sangre?", "respuesta": "riñon"},
+    {"pregunta": "¿Cuál es el planeta más caliente?", "respuesta": "venus"},
+    {"pregunta": "¿Qué país tiene el Taj Mahal?", "respuesta": "india"},
+    {"pregunta": "¿Cuál es el elemento químico más abundante del universo?", "respuesta": "hidrogeno"},
 ]
 
-def normalizar(texto: str) -> str:
-    texto = texto.lower().strip()
-    texto = ''.join(
-        c for c in unicodedata.normalize('NFD', texto)
-        if unicodedata.category(c) != 'Mn'
-    )
-    return texto
+def load_warns():
+    if not os.path.exists(WARNS_FILE):
+        return {}
+    with open(WARNS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_warns(data):
+    with open(WARNS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+warns = load_warns()
 
 @bot.event
 async def on_ready():
     print(f"Conectado como {bot.user}")
-    try:
-        await bot.tree.sync()
-    except Exception as e:
-        print(e)
 
 @bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")
-
-@bot.command()
-@commands.has_permissions(moderate_members=True)
-async def warn(ctx, member: discord.Member, *, reason):
-    warnings_db.setdefault(str(member.id), []).append(reason)
-    total = len(warnings_db[str(member.id)])
-    await ctx.send(f"{member.mention} has sido advertido y ahora tienes {total} advertencias.\nRazón: {reason}")
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="Sin razón"):
+    await member.kick(reason=reason)
+    await ctx.send(f"✅ {member.mention} expulsado. Motivo: {reason}")
 
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason="Sin razón"):
     await member.ban(reason=reason)
-    await ctx.send(f"{member.mention} baneado. Razón: {reason}")
+    await ctx.send(f"✅ {member.mention} baneado. Motivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def unban(ctx, user_id: int):
+    user = await bot.fetch_user(user_id)
+    await ctx.guild.unban(user)
+    await ctx.send(f"✅ {user.name} desbaneado.")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def warn(ctx, member: discord.Member, *, reason="Sin razón"):
+    guild_id = str(ctx.guild.id)
+    user_id = str(member.id)
+    warns.setdefault(guild_id, {})
+    warns[guild_id].setdefault(user_id, [])
+    warns[guild_id][user_id].append(reason)
+    save_warns(warns)
+    await ctx.send(f"⚠️ {member.mention} advertido. Motivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def unwarn(ctx, member: discord.Member):
+    guild_id = str(ctx.guild.id)
+    user_id = str(member.id)
+    if guild_id not in warns or user_id not in warns[guild_id] or not warns[guild_id][user_id]:
+        await ctx.send("❌ Ese usuario no tiene warns.")
+        return
+    warns[guild_id][user_id].pop()
+    if not warns[guild_id][user_id]:
+        del warns[guild_id][user_id]
+    if not warns[guild_id]:
+        del warns[guild_id]
+    save_warns(warns)
+    await ctx.send(f"✅ Se ha quitado un warn a {member.mention}")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def warnings(ctx, member: discord.Member):
+    guild_id = str(ctx.guild.id)
+    user_id = str(member.id)
+    user_warns = warns.get(guild_id, {}).get(user_id, [])
+    if not user_warns:
+        await ctx.send(f"✅ {member.mention} no tiene warns.")
+        return
+    texto = "\n".join([f"{i+1}. {w}" for i, w in enumerate(user_warns)])
+    await ctx.send(f"⚠️ Warns de {member.mention}:\n{texto}")
 
 @bot.command()
 @commands.has_permissions(moderate_members=True)
-async def mute(ctx, member: discord.Member, tiempo: str, *, reason="Sin razón"):
-    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
-    try:
-        num = int(tiempo[:-1])
-        unit = tiempo[-1].lower()
-        seconds = num * units[unit]
-    except:
-        return await ctx.send("Formato inválido. Usa 30s, 30m, 30h o 30d.")
-
-    await member.timeout(timedelta(seconds=seconds), reason=reason)
-    await ctx.send(f"{member.mention} silenciado por {tiempo}. Razón: {reason}")
+async def mute(ctx, member: discord.Member, tiempo: int):
+    await member.timeout(timedelta(minutes=tiempo), reason="Muteado por moderación")
+    await ctx.send(f"✅ {member.mention} muteado por {tiempo} minutos.")
 
 @bot.command()
-async def avatar(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    embed = discord.Embed(title=f"Avatar de {member}", color=discord.Color.blue())
-    embed.set_image(url=member.display_avatar.url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def warnings(ctx, member: discord.Member):
-    warns = warnings_db.get(str(member.id), [])
-    if not warns:
-        return await ctx.send(f"{member.mention} no tiene warns.")
-    msg = "\n".join([f"{i+1}. {r}" for i, r in enumerate(warns)])
-    await ctx.send(f"Warns de {member.mention}:\n{msg}")
+@commands.has_permissions(moderate_members=True)
+async def unmute(ctx, member: discord.Member):
+    await member.timeout(None)
+    await ctx.send(f"✅ {member.mention} desmuteado.")
 
 @bot.command()
 async def pregunta(ctx):
-    if not preguntas:
-        return await ctx.send("No hay preguntas cargadas.")
-
-    key = ctx.guild.id if ctx.guild else ctx.author.id
-    if key in pregunta_activa:
-        return await ctx.send("Ya hay una pregunta activa.")
-
-    pregunta, respuesta = random.choice(preguntas)
-
-    pregunta_activa[key] = {
-        "answer": normalizar(respuesta),
-        "channel_id": ctx.channel.id,
-        "user_id": ctx.author.id
-    }
-
-    embed = discord.Embed(
-        title="Yahin Pregunta",
-        description=f"**{pregunta}**\n\nTienes **1 minuto** para responder.",
-        color=discord.Color.blurple()
-    )
-    await ctx.send(embed=embed)
-
+    q = random.choice(preguntas)
+    await ctx.send(f"🟡 Pregunta: **{q['pregunta']}**\nTienes 1 minuto para responder.")
     def check(m):
-        return (
-            m.channel.id == ctx.channel.id and
-            m.author.id == ctx.author.id and
-            normalizar(m.content) == pregunta_activa[key]["answer"]
-        )
-
+        return m.channel == ctx.channel and m.author == ctx.author
     try:
-        await bot.wait_for("message", timeout=60, check=check)
-        pregunta_activa.pop(key, None)
-        await ctx.send(f"✅ {ctx.author.mention} ¡La adivinaste!")
-    except discord.TimeoutError:
-        pregunta_activa.pop(key, None)
-        await ctx.send(f"⏰ {ctx.author.mention}, se acabó el tiempo. La respuesta era: **{respuesta}**")
+        msg = await bot.wait_for("message", timeout=60.0, check=check)
+        if msg.content.lower().strip() == q["respuesta"].lower().strip():
+            await ctx.send("✅ Respuesta correcta.")
+        else:
+            await ctx.send(f"❌ Respuesta incorrecta. La correcta era: **{q['respuesta']}**")
+    except asyncio.TimeoutError:
+        await ctx.send(f"⌛ Se acabó el tiempo. La respuesta era: **{q['respuesta']}**")
 
-@bot.command(name="addrol")
-@commands.has_permissions(manage_roles=True)
-async def addrol(ctx, rol: discord.Role, member: discord.Member):
-    await member.add_roles(rol)
-    await ctx.send(f"Rol {rol.mention} dado a {member.mention}")
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def addrol(ctx, member: discord.Member, role: discord.Role):
+    await member.add_roles(role)
+    await ctx.send(f"✅ Rol {role.mention} añadido a {member.mention}")
 
 @bot.command()
 async def staff(ctx):
-    role_id = 1521606098791043092
-    role = ctx.guild.get_role(role_id)
+    role = ctx.guild.get_role(ROLE_ID_STAFF)
+    if not role:
+        await ctx.send("❌ No encontré el rol staff.")
+        return
+    online_members = [m.mention for m in role.members if m.status != discord.Status.offline]
+    if not online_members:
+        await ctx.send("No hay usuarios conectados con ese rol.")
+        return
+    await ctx.send(f"📣 {' '.join(online_members)}")
 
-    if role is None:
-        return await ctx.send("No encontré ese rol.")
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ No tienes permisos para usar ese comando.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("❌ Faltan argumentos.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Argumento inválido.")
+    else:
+        await ctx.send(f"❌ Error: {error}")
 
-    conectados = [
-        m for m in role.members
-        if m.status != discord.Status.offline and not m.bot
-    ]
-
-    if not conectados:
-        return await ctx.send("No hay miembros del staff conectados.")
-
-    mentions = " ".join(m.mention for m in conectados)
-
-    embed = discord.Embed(
-        title="Staff conectado",
-        description=f"Hay **{len(conectados)}** miembros conectados:\n\n{mentions}",
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed)
-
-
-keep_alive()
-bot.run(TOKEN)
+bot.run(os.getenv("TOKEN"))
